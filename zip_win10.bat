@@ -1,0 +1,1 @@
+ tar -cvzf algo.tar.gz Algorithm config.json requirements.txt
