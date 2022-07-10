@@ -1,0 +1,8 @@
+TestData/
+main.py
+Task/
+Framework/
+Algorithm/__pycache__/
+Algorithm/MItrain/Trainingdata/
+Algorithm/MItrain/.ipynb_checkpoints
+requirements.txt
