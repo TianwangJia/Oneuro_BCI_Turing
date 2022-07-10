@@ -20,7 +20,7 @@ class AlgorithmImplementTuring(AlgorithmInterface):
         # 计算时间
         cal_time = 3
         # 计算长度
-        self.cal_len = 750  #cal_time * self.samp_rate  #750  600,500
+        self.cal_len = 600  #cal_time * self.samp_rate  #750  600,500
         # cache初始化
         self.init_cache()
         # SSVEP算法
@@ -90,7 +90,8 @@ class AlgorithmImplementTuring(AlgorithmInterface):
         recdata_mi = datafilter_mi[:, startpoint:startpoint + self.cal_len]
         # 分类结果
         result_ssvep, proba_ssvep = self.ssvep_method.recognize(recdata_ssvep)
-        result_mi, proba_mi = self.mi_method.recognize(recdata_mi, data_model.subject_id, roboaction)
+        # result_mi, proba_mi = self.mi_method.recognize(recdata_mi, data_model.subject_id, roboaction)
+        result_mi = self.mi_method.recognize(recdata_mi, data_model.subject_id, roboaction)
         # 结果分析
         if result_ssvep < 7:
             result = result_ssvep

@@ -42,22 +42,23 @@ class MImethod:
         # left - idle
         if roboaction in [1, 6, 8]:
             # 预测
-            proba = self.pipe_li.predict_proba(np.expand_dims(data, 0))
+            # proba = self.pipe_li.predict_proba(np.expand_dims(data, 0))
             result = self.pipe_li.predict(np.expand_dims(data, 0))
 
         # right - idle
         elif roboaction in [4, 7, 9]:
-            proba = self.pipe_ri.predict_proba(np.expand_dims(data, 0))
+            # proba = self.pipe_ri.predict_proba(np.expand_dims(data, 0))
             result = self.pipe_ri.predict(np.expand_dims(data, 0))
 
         # left - right
         elif roboaction in [2, 3]:
-           proba = self.pipe_lr.predict_proba(np.expand_dims(data, 0))
+        #    proba = self.pipe_lr.predict_proba(np.expand_dims(data, 0))
            result = self.pipe_lr.predict(np.expand_dims(data, 0))
 
         # 仅有SSVEP，不进行MI检测
         else:
-            proba = [[0, 0]]
+            # proba = [[0, 0]]
             result = [7]
 
-        return result[0], max(proba[0])
+        # max(proba[0])
+        return result[0]
