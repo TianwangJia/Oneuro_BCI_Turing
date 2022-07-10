@@ -1,0 +1,4 @@
+{
+	"unitImage": "python:2022-py3.10-gpu",
+	"command": ["/bin/sh", "-c", "python main.py"]
+}
