@@ -1,4 +1,5 @@
 
+from lib2to3.pgen2.literals import test
 import joblib
 import os
 import numpy as np
@@ -9,6 +10,8 @@ from mne.decoding import CSP
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.model_selection import ShuffleSplit, cross_val_score
 from loguru import logger
+from sklearn.pipeline import Pipeline
+from sklearn.svm import SVC
 
 def data_generate(trdata_path):
     # 读取数据
@@ -66,6 +69,60 @@ def data_generate(trdata_path):
 
     return [l_epochdata, l_labels], [r_epochdata, r_labels], [i_epochdata, i_labels]
 
+# def mi_train(data_list1,data_list2):
+#     epochdata1 = data_list1[0]
+#     epochdata2 = data_list2[0]
+#     label1 = data_list1[1]
+#     label2 = data_list2[1]
+#     epochdata = np.concatenate((epochdata1,epochdata2),axis=0)
+#     labels = np.concatenate((label1,label2),axis=0)
+
+#     # csp共同空间模式
+#     lda = LinearDiscriminantAnalysis()
+#     csp = CSP(n_components=4, reg=None, log=True, norm_trace=False)
+
+#     # 通过交叉验证来获得最佳的分类器
+#     scores = []
+#     traindataset = []
+#     traindatasetid = []
+
+#     #cv = ShuffleSplit(10, test_size=0.2)
+#     cv = ShuffleSplit(10, test_size=0.2, random_state=42) 
+#     cv_split = cv.split(epochdata)
+#     for train_idx, test_idx in cv_split:
+#         y_train, y_test = labels[train_idx], labels[test_idx]
+#         try:
+#             traindata = epochdata[train_idx]
+#             X_train = csp.fit_transform(traindata, y_train)  # csp空间滤波器训练
+#         except:
+#             continue
+
+#         lda.fit(X_train, y_train)  # 线性分类器训练
+#         X_test = csp.transform(epochdata[test_idx])  # 测试集特征提取
+#         scores.append(lda.score(X_test, y_test))
+#         traindataset.append(traindata)
+#         traindatasetid.append(y_train)
+
+#     # 获得最佳的性能的分类器参数
+#     if len(scores) > 0:  # 获得了分类器
+#         mid = np.argsort(scores)[-1] # 返回元素值从小到大排序后索引值的数组, -1返回最大索引
+#         X_train = csp.fit_transform(traindataset[mid], traindatasetid[mid])
+#         lda.fit(X_train, traindatasetid[mid])
+
+#         logger.info("============================================")
+#         logger.info("最佳分类器性能")
+#         logger.info("使用了{}组训练数据".format(epochdata.shape[0]))
+#         logger.info("分类正确率为：{}".format(scores[mid]))
+#         logger.info("============================================")
+#         logger.info("socres: {}".format(scores))
+#         logger.info("average scores {}".format(sum(scores)/len(scores)))
+
+#         return csp, lda
+
+#     else:
+#         logger.info('更新分类器失败')
+
+
 def mi_train(data_list1,data_list2):
     epochdata1 = data_list1[0]
     epochdata2 = data_list2[0]
@@ -74,9 +131,8 @@ def mi_train(data_list1,data_list2):
     epochdata = np.concatenate((epochdata1,epochdata2),axis=0)
     labels = np.concatenate((label1,label2),axis=0)
 
-    # csp共同空间模式
-    lda = LinearDiscriminantAnalysis()
-    csp = CSP(n_components=4, reg=None, log=True, norm_trace=False)
+    # 制作csp与svm的pipe
+    pipe = Pipeline([('csp', CSP(n_components=4, reg=None, log=True, norm_trace=False)), ('svc', SVC())])
 
     # 通过交叉验证来获得最佳的分类器
     scores = []
@@ -89,22 +145,19 @@ def mi_train(data_list1,data_list2):
     for train_idx, test_idx in cv_split:
         y_train, y_test = labels[train_idx], labels[test_idx]
         try:
-            traindata = epochdata[train_idx]
-            X_train = csp.fit_transform(traindata, y_train)  # csp空间滤波器训练
+            X_train = epochdata[train_idx]
+            pipe.fit(X_train, y_train)  # csp fit_transform, svm fit
         except:
             continue
-
-        lda.fit(X_train, y_train)  # 线性分类器训练
-        X_test = csp.transform(epochdata[test_idx])  # 测试集特征提取
-        scores.append(lda.score(X_test, y_test))
-        traindataset.append(traindata)
+        X_test = epochdata[test_idx]
+        scores.append(pipe.score(X_test, y_test)) # csp transform, svm score
+        traindataset.append(X_train)
         traindatasetid.append(y_train)
 
     # 获得最佳的性能的分类器参数
     if len(scores) > 0:  # 获得了分类器
         mid = np.argsort(scores)[-1] # 返回元素值从小到大排序后索引值的数组, -1返回最大索引
-        X_train = csp.fit_transform(traindataset[mid], traindatasetid[mid])
-        lda.fit(X_train, traindatasetid[mid])
+        pipe.fit(traindataset[mid], traindatasetid[mid]) # csp fit_transform, svm fit 用于保存模型
 
         logger.info("============================================")
         logger.info("最佳分类器性能")
@@ -114,7 +167,7 @@ def mi_train(data_list1,data_list2):
         logger.info("socres: {}".format(scores))
         logger.info("average scores {}".format(sum(scores)/len(scores)))
 
-        return csp, lda
+        return pipe
 
     else:
         logger.info('更新分类器失败')
@@ -124,19 +177,25 @@ if __name__ == '__main__':
     # 数据、模型路径
     algr_path = os.path.abspath('..')
     mitrain_path = os.path.abspath('.')
-    trdata_path = os.path.join(mitrain_path, 'Trainingdata', 'S1')
-    cspmodel_path = os.path.join(algr_path, 'MImodel')
-    ldamodel_path = os.path.join(algr_path, 'MImodel')
-    # 生成训练数据
-    l_list, r_list, i_list = data_generate(trdata_path)
-    # 训练模型
-    csp_lr, lda_lr = mi_train(l_list, r_list)
-    csp_li, lda_li = mi_train(l_list, i_list)
-    csp_ri, lda_ri = mi_train(r_list, i_list)
-    # 保存模型
-    joblib.dump(csp_lr, cspmodel_path + '/csp_lr.pkl')
-    joblib.dump(lda_lr, ldamodel_path + '/lda_lr.pkl')
-    joblib.dump(csp_li, cspmodel_path + '/csp_li.pkl')
-    joblib.dump(lda_li, ldamodel_path + '/lda_li.pkl')
-    joblib.dump(csp_ri, cspmodel_path + '/csp_ri.pkl')
-    joblib.dump(lda_ri, ldamodel_path + '/lda_ri.pkl')
+    model_path = os.path.join(algr_path, 'MImodel')
+
+    # 创建保存8个被试模型的文件夹
+    num_subject = 8
+    for i in range(num_subject):
+        os.makedirs(model_path+'/S'+str(i+1), exist_ok=True)
+
+    # 8个被试的数据路径
+    trdata_path = []
+    for i in range(num_subject):
+        trdata_path.append(mitrain_path+'/Trainingdata/S'+str(i+1))
+
+    # 获取8个被试的训练数据, 训练并保存模型
+    for i in range(num_subject):
+        l_list, r_list, i_list = data_generate(trdata_path[i])
+        pipe_lr = mi_train(l_list, r_list)
+        pipe_li = mi_train(l_list, i_list)
+        pipe_ri = mi_train(r_list, i_list)
+        joblib.dump(pipe_lr, model_path + '/S' + str(i+1) + '/pipe_lr.pkl')
+        joblib.dump(pipe_li, model_path + '/S' + str(i+1) + '/pipe_li.pkl')
+        joblib.dump(pipe_ri, model_path + '/S' + str(i+1) + '/pipe_ri.pkl')
+
